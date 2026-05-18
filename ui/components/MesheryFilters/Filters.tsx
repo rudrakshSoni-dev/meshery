@@ -23,7 +23,8 @@ import ConfigurationSubscription from '../graphql/subscriptions/ConfigurationSub
 import fetchCatalogFilter from '../graphql/queries/CatalogFilterQuery';
 import { iconMedium } from '../../css/icons.styles';
 import { RJSFModalWrapper } from '../General/Modals/Modal';
-import { getUnit8ArrayDecodedFile, modifyRJSFSchema } from '../../utils/utils';
+import { modifyRJSFSchema } from '../../utils/utils';
+import { arrayBufferToBase64 } from '../../utils/binary';
 import Filter from '../../public/static/img/drawer-icons/filter_svg';
 import { getMeshModels } from '../../api/meshmodel';
 import _ from 'lodash';
@@ -741,9 +742,10 @@ function MesheryFilters() {
     // Create a reader
     const reader = new FileReader();
     reader.addEventListener('load', (event) => {
-      let uint8 = new Uint8Array(event.target.result);
+      const buffer = event.target.result as ArrayBuffer;
+      const base64 = arrayBufferToBase64(buffer);
       handleSubmit({
-        data: Array.from(uint8),
+        data: base64,
         name: file?.name || 'meshery_' + Math.floor(trueRandom() * 100),
         type: FILE_OPS.FILE_UPLOAD,
         metadata: metadata,
@@ -1084,7 +1086,7 @@ function MesheryFilters() {
           save: true,
           filter_data: {
             name,
-            filter_file: getUnit8ArrayDecodedFile(file),
+            filter_file: arrayBufferToBase64(file as ArrayBuffer),
           },
         });
         break;
