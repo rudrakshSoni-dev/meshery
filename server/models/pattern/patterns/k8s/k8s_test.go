@@ -902,7 +902,6 @@ func TestDryRun_InDesignNamespaces_FallbackNameConflict(t *testing.T) {
 	})
 }
 
-<<<<<<< HEAD
 // TestResolveResourcePath_NamespaceResolution tests namespace resolution order for namespaced and cluster-scoped resources.
 func TestResolveResourcePath_NamespaceResolution(t *testing.T) {
 	groupVersions := []schema.GroupVersion{
@@ -1051,7 +1050,8 @@ func TestResolveResourcePath_NamespaceResolution(t *testing.T) {
 			}
 		})
 	}
-=======
+}
+
 // forbiddenStatus builds the Forbidden Status the API server returns when a policy rejects a create.
 func forbiddenStatus(message string) metav1.Status {
 	return metav1.Status{
@@ -1149,5 +1149,4 @@ func TestDryRun_InDesignNamespaces_FallbackForbidden(t *testing.T) {
 			t.Errorf("expected the server's message unchanged, got %q", st["message"])
 		}
 	})
->>>>>>> upstream/master
 }
