@@ -1150,3 +1150,57 @@ func TestDryRun_InDesignNamespaces_FallbackForbidden(t *testing.T) {
 		}
 	})
 }
+
+// TestDryRun_UnconfiguredNamespace pins that a component without a configured namespace has its namespace checks
+// run against the namespace its request is sent to, and that a cluster-scoped kind is never given one.
+func TestDryRun_UnconfiguredNamespace(t *testing.T) {
+	ingress := func() map[string]interface{} {
+		return map[string]interface{}{
+			"apiVersion": "networking.k8s.io/v1",
+			"kind":       "Ingress",
+			"metadata":   map[string]interface{}{"name": "web", "namespace": "default"},
+		}
+	}
+	defaultMissing := newFakeRESTClient(func(req *http.Request) (*http.Response, error) {
+		return jsonResponse(http.StatusNotFound, namespaceNotFoundStatus("default"))
+	})
+
+	t.Run("declared default missing from the cluster passes the create", func(t *testing.T) {
+		opts := DryRunOptions{RESTMapper: newTestRESTMapper(), DeclaredNamespaces: map[string]bool{"default": true}}
+		st, success, err := dryRun(defaultMissing, ingress(), "", false, opts)
+		if err != nil || !success {
+			t.Fatalf("expected a non-fatal pass, got success=%v err=%v st=%v", success, err, st)
+		}
+		if st["kind"] != "Ingress" {
+			t.Errorf("expected the workload itself to be returned, got: %v", st)
+		}
+	})
+
+	t.Run("missing default namespace on undeploy is not deployed", func(t *testing.T) {
+		st, success, err := dryRun(defaultMissing, ingress(), "", true, DryRunOptions{RESTMapper: newTestRESTMapper()})
+		if err != nil || !success || st["status"] != "Success" {
+			t.Fatalf("expected the missing namespace to be suppressed, got success=%v err=%v st=%v", success, err, st)
+		}
+	})
+
+	t.Run("cluster-scoped kind keeps no namespace", func(t *testing.T) {
+		var paths []string
+		rClient := newFakeRESTClient(func(req *http.Request) (*http.Response, error) {
+			paths = append(paths, req.URL.Path)
+			return jsonResponse(http.StatusNotFound, namespaceNotFoundStatus("default"))
+		})
+		ns := map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Namespace",
+			"metadata":   map[string]interface{}{"name": "staging", "namespace": "default"},
+		}
+		opts := DryRunOptions{RESTMapper: newTestRESTMapper(), DeclaredNamespaces: map[string]bool{"default": true}}
+		_, success, _ := dryRun(rClient, ns, "", false, opts)
+		if success {
+			t.Errorf("expected the failure to surface without a fallback retry")
+		}
+		if len(paths) != 1 || paths[0] != "/api/v1/namespaces" {
+			t.Errorf("expected a single cluster-scoped request, got %v", paths)
+		}
+	})
+}

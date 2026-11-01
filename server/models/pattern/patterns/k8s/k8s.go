@@ -70,6 +70,12 @@ func dryRun(rClient rest.Interface, k8sResource map[string]interface{}, namespac
 		return nil, false, ErrDryRun(fmt.Errorf("RESTClient is nil"), "")
 	}
 
+	// A namespaced kind without a configured namespace is sent to the one its body carries (usually "default"), so
+	// the namespace checks below must name that namespace, not the empty one.
+	if namespace == "" {
+		namespace = requestNamespace(k8sResource, opts.RESTMapper)
+	}
+
 	st, success, reqErr := executeDryRunRequest(rClient, k8sResource, namespace, isDelete, opts.RESTMapper)
 
 	// Suppress 404 NotFound on undeploy dry-runs only when the object being deleted is what is missing
@@ -251,6 +257,18 @@ func resolveResourcePath(k8sResource map[string]interface{}, namespace string, m
 	}
 
 	return basePath, resourcePath, nil
+}
+
+// requestNamespace returns the namespace resolveResourcePath sends k8sResource to when none is configured, or ""
+// for a cluster-scoped kind or an unresolvable one. It reads the resolved path rather than the body, because the
+// body's metadata.namespace is set to "default" for cluster-scoped kinds too.
+func requestNamespace(k8sResource map[string]interface{}, mapper meta.RESTMapper) string {
+	basePath, _, err := resolveResourcePath(k8sResource, "", mapper)
+	if err != nil {
+		return ""
+	}
+	_, namespace, _ := strings.Cut(basePath, "/namespaces/")
+	return namespace
 }
 
 // kindToResource converts a Kubernetes Kind to its naive lowercased plural resource name.
